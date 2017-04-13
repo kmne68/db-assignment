@@ -14,6 +14,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -21,6 +22,7 @@ import javax.swing.Timer;
 import javax.swing.Icon;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
+import javax.swing.table.DefaultTableModel;
 
 /**
  * The application's main frame.
@@ -30,6 +32,7 @@ public class SalesDBView extends FrameView {
     String dbURL = "jdbc:mysql://localhost:3306/salesdb?useSSL=false";
     String dbUser = "root";
     String dbPwd = "";
+    boolean loading = false; // stops statsu message from changing on load events
 
     public SalesDBView(SingleFrameApplication app) {
         super(app);
@@ -140,6 +143,11 @@ public class SalesDBView extends FrameView {
         jLabel1.setName("jLabel1"); // NOI18N
 
         cmb_customers.setName("cmb_customers"); // NOI18N
+        cmb_customers.addItemListener(new java.awt.event.ItemListener() {
+            public void itemStateChanged(java.awt.event.ItemEvent evt) {
+                cmb_customersItemStateChanged(evt);
+            }
+        });
 
         jScrollPane1.setName("jScrollPane1"); // NOI18N
 
@@ -163,6 +171,11 @@ public class SalesDBView extends FrameView {
 
         btn_clear.setText(resourceMap.getString("btn_clear.text")); // NOI18N
         btn_clear.setName("btn_clear"); // NOI18N
+        btn_clear.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btn_clearActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout mainPanelLayout = new javax.swing.GroupLayout(mainPanel);
         mainPanel.setLayout(mainPanelLayout);
@@ -278,6 +291,8 @@ public class SalesDBView extends FrameView {
     }// </editor-fold>//GEN-END:initComponents
 
     private void mnu_loadActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_mnu_loadActionPerformed
+        loading = true;
+        
         statusMessageLabel.setText("");
         String sql = "";
         try {
@@ -317,7 +332,79 @@ public class SalesDBView extends FrameView {
         catch (Exception e) {
             statusMessageLabel.setText("General Err0r");
         }
+        loading = false;
     }//GEN-LAST:event_mnu_loadActionPerformed
+
+    private void cmb_customersItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_cmb_customersItemStateChanged
+        
+        if(loading) {
+            return;
+        }
+        
+        statusMessageLabel.setText("");
+        
+        if(cmb_customers.getSelectedIndex() == -1) {
+            // no selection
+            statusMessageLabel.setText("No customer selected");
+            return;
+        }
+        
+        // get customer from combo box
+        Customer c = (Customer) cmb_customers.getSelectedItem();
+        String[][] t;
+        DefaultTableModel m; // tbl_sales
+        
+        String[] cols = {"Order Date", "Order ID", "Ship Date", "Item Count", "Order Total" };
+        
+        String sql = "SELECT s.order_date, s.order_id, s.ship_date, count(i.item_id) AS ItemCount, s.total " +
+                "FROM sales_order s, item i WHERE s.order_id = i.order_id AND (s.customer_id = ?)" +
+                "GROUP BY s.order_date, s.order_id, s.ship_date, s.total ORDER BY s.order_date, s.order_id";
+        
+        try {
+            Connection conn = DriverManager.getConnection(dbURL, dbUser, dbPwd);
+            PreparedStatement ps = conn.prepareStatement(sql);
+            ps.setInt(1, c.getCustomerID()); // put variable in for question mark
+            ResultSet r = ps.executeQuery();
+            r.last(); // number of items in set
+            int lastRow = r.getRow();
+            
+            if(lastRow == 0) {
+                // set table for no sales message
+                tbl_sales.setModel(new DefaultTableModel());
+                statusMessageLabel.setText("No sales on file.");
+            } else {
+                statusMessageLabel.setText("Orders on file = " + lastRow);
+                t = new String[lastRow][5]; // rows = last row, columns = 5
+                m = new DefaultTableModel(t, cols);
+                tbl_sales.setModel(m);
+                
+                r.first(); // go to top of set
+                do {
+                    int tr = r.getRow() - 1; // point to row we watn in the table
+                    tbl_sales.setValueAt(r.getString("order_date"), tr, 0);
+                    tbl_sales.setValueAt(r.getString("order_id"), tr, 1);
+                    tbl_sales.setValueAt(r.getString("ship_date"), tr, 2);
+                    tbl_sales.setValueAt(r.getInt("ItemCount"), tr, 3);
+                    tbl_sales.setValueAt(r.getDouble("total"), tr, 4);
+                } while (r.next());
+                r.close();
+                conn.close();
+            }
+            
+        } catch(SQLException e) {
+            statusMessageLabel.setText("SQL Error: " + e.getMessage());            
+        }        
+        
+    }//GEN-LAST:event_cmb_customersItemStateChanged
+
+    private void btn_clearActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btn_clearActionPerformed
+        
+        statusMessageLabel.setText("");
+        txt_total.setText("");
+        tbl_sales.setModel(new DefaultTableModel());
+        cmb_customers.setSelectedIndex(-1);
+
+    }//GEN-LAST:event_btn_clearActionPerformed
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btn_clear;
