@@ -32,7 +32,7 @@ import javax.swing.table.DefaultTableModel;
 public class SalesDBView extends FrameView {
 
     String dbURL = "jdbc:mysql://localhost:3306/salesdb?useSSL=false";
-    String dbUser = "root";
+    String dbUser = "";
     String dbPwd = "";
     boolean loading = false; // stops statsu message from changing on load events
 
@@ -399,7 +399,7 @@ double totalSales = 0;
                     tbl_sales.setValueAt(currency.format(r.getDouble("total")), tr, 4);
                     
                     totalSales += r.getDouble("total");
-                    System.out.println("total " + totalSales);
+                    // System.out.println("total " + totalSales);
                     tbl_sales.getColumnModel().getColumn(4).setCellRenderer(rightRenderer);
                //     txt_total.setText(currency.format(Double.toString(totalSales)));
                 } while (r.next());
